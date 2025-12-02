@@ -1,20 +1,14 @@
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_,or_
 from sqlalchemy.orm  import Session
 from rental.models import Rental
 from payment.models import Payment 
 from dashboard.model import City,Country,Address,Store,Inventory,FilmCategory
 from film.models import Film
-from datetime import datetime
 from category.model import Category
-from fastapi import  Depends
-from dbconnection import get_db
 
 
-
-
-def total_rental(start_date:datetime=None,end_date:datetime=None,store_id:int=None,
-                 city_id:int=None,country_id:int=None,category_id:int=None,film_id:int=None, db: Session=Depends(get_db)):
+def total_rental(start_date,end_date,store_id,city_id,country_id,category_id,film_id, db: Session):
     query = (
         select (Store.store_id,City.city_id,Country.country_id,Category.category_id,Film.film_id,
                 (func.count(Rental.rental_id).label("total_rentals")))
@@ -27,21 +21,24 @@ def total_rental(start_date:datetime=None,end_date:datetime=None,store_id:int=No
         .outerjoin(Film, Inventory.film_id == Film.film_id)
         .outerjoin(FilmCategory, Film.film_id == FilmCategory.film_id)
         .outerjoin(Category, FilmCategory.category_id == Category.category_id)
-        .where(
-            and_(
-                Rental.rental_date.between(start_date, end_date),
-                Store.store_id == store_id,
-                City.city_id==city_id,
-                Country.country_id==country_id,
-                Category.category_id==category_id,
-                Film.film_id==film_id
-                ) 
-        )    
+       .where(
+          and_(
+               or_(Rental.rental_date.between(start_date, end_date), start_date == None, end_date == None),
+               or_(Store.store_id == store_id, store_id == None),
+               or_(City.city_id == city_id, city_id == None),
+               or_(Country.country_id == country_id, country_id == None),
+               or_(Category.category_id == category_id, category_id == None),
+               or_(Film.film_id == film_id, film_id == None)
+    )
+)
+
         .group_by (Store.store_id,Category.category_id,Film.film_id,Country.country_id,City.city_id)
         .order_by (func.count(Rental.rental_id) )       
         
     )
-    return db.execute(query).all()
+    result = db.execute(query).all()
+    return result
+   
 
 def total_revenue(start_date,end_date,store_id,city_id,country_id,category_id,film_id, db: Session):
     query = (
@@ -58,19 +55,20 @@ def total_revenue(start_date,end_date,store_id,city_id,country_id,category_id,fi
         .join(FilmCategory, Film.film_id == FilmCategory.film_id)
         .outerjoin(Category, FilmCategory.category_id == Category.category_id)
         .where(
-            and_(
-                Payment.payment_date.between(start_date, end_date),
-                Store.store_id == store_id,
-                City.city_id==city_id,
-                Country.country_id==country_id,
-                Category.category_id==category_id,
-                Film.film_id==film_id
-            )   
+          and_(
+              or_(Rental.rental_date.between(start_date, end_date), start_date == None, end_date == None),
+              or_(Store.store_id == store_id, store_id == None),
+              or_(City.city_id == city_id, city_id == None),
+              or_(Country.country_id == country_id, country_id == None),
+              or_(Category.category_id == category_id, category_id == None),
+              or_(Film.film_id == film_id, film_id == None)
+        )
         )
         .group_by(Store.store_id,City.city_id,Country.country_id,Category.category_id,Film.film_id)
         .order_by(func.sum(Payment.amount))
     )
-    return db.execute(query).all()
+    result = db.execute(query).all()
+    return result
 
 def top5_rented_movie(start_date,end_date,store_id,city_id,country_id,category_id, db: Session):
     query =(
@@ -86,16 +84,15 @@ def top5_rented_movie(start_date,end_date,store_id,city_id,country_id,category_i
         .outerjoin(FilmCategory, Film.film_id == FilmCategory.film_id)
         .outerjoin(Category, FilmCategory.category_id == Category.category_id)
         .where(
-            and_(
-                Rental.rental_date.between(start_date, end_date),
-                Store.store_id == store_id,
-                City.city_id==city_id,
-                Country.country_id==country_id,
-                Category.category_id==category_id,
-                
-                ) 
-        )       
-       
+          and_(
+              or_(Rental.rental_date.between(start_date, end_date), start_date == None, end_date == None),
+              or_(Store.store_id == store_id, store_id == None),
+              or_(City.city_id == city_id, city_id == None),
+              or_(Country.country_id == country_id, country_id == None),
+              or_(Category.category_id == category_id, category_id == None)
+             
+        )      
+        )
         .group_by(Film.film_id, Film.title,Store.store_id,City.city_id,Country.country_id,Category.category_id)
         .order_by(func.count(Rental.rental_id).desc())
         .limit(5)
@@ -103,11 +100,11 @@ def top5_rented_movie(start_date,end_date,store_id,city_id,country_id,category_i
 
     
 
-    return db.execute(query).fetchall()
+    result = db.execute(query).all()
+    return result
 
 
-def rentals_per_category(start_date:datetime=None,end_date:datetime=None,store_id:int=None,city_id:int=None,
-                         country_id:int=None,category_id:int=None,film_id:int=None, db: Session=Depends(get_db)):
+def rentals_per_category(start_date,end_date,store_id,city_id,country_id,category_id,film_id, db: Session):
     query = (
         select(
             Category.category_id,Category.name,Store.store_id,City.city_id,Country.country_id,Film.film_id,
@@ -122,19 +119,20 @@ def rentals_per_category(start_date:datetime=None,end_date:datetime=None,store_i
         .outerjoin(FilmCategory, Film.film_id == FilmCategory.film_id)
         .outerjoin(Category, FilmCategory.category_id == Category.category_id)
         .where(
-            and_(
-                Rental.rental_date.between(start_date, end_date),
-                Store.store_id == store_id,
-                City.city_id==city_id,
-                Country.country_id==country_id,
-                Category.category_id==category_id,
-                Film.film_id==film_id
-            )
+          and_(
+              or_(Rental.rental_date.between(start_date, end_date), start_date == None, end_date == None),
+              or_(Store.store_id == store_id, store_id == None),
+              or_(City.city_id == city_id, city_id == None),
+              or_(Country.country_id == country_id, country_id == None),
+              or_(Category.category_id == category_id, category_id == None),
+              or_(Film.film_id == film_id, film_id == None)
+        )
         )
         .group_by(Category.category_id, Category.name,Store.store_id,City.city_id,Country.country_id,Film.film_id)
         .order_by(func.count(Rental.rental_id))
     )
-    return db.execute(query).all()
+    result = db.execute(query).all()
+    return  result
 
 def rentals_per_day(start_date,end_date,store_id,city_id,country_id,category_id,film_id, db: Session):
    
@@ -151,19 +149,21 @@ def rentals_per_day(start_date,end_date,store_id,city_id,country_id,category_id,
         .outerjoin(FilmCategory, Film.film_id == FilmCategory.film_id)
         .outerjoin(Category, FilmCategory.category_id == Category.category_id)
         .where(
-            and_(
-                Rental.rental_date.between(start_date, end_date),
-                Store.store_id == store_id,
-                City.city_id==city_id,
-                Country.country_id==country_id,
-                Category.category_id==category_id,
-                Film.film_id==film_id
-                ) 
-        )    
+          and_(
+              or_(Rental.rental_date.between(start_date, end_date), start_date == None, end_date == None),
+              or_(Store.store_id == store_id, store_id == None),
+              or_(City.city_id == city_id, city_id == None),
+              or_(Country.country_id == country_id, country_id == None),
+              or_(Category.category_id == category_id, category_id == None),
+              or_(Film.film_id == film_id, film_id == None)
+        )
+        )  
         .group_by (Store.store_id,Category.category_id,Film.film_id,Country.country_id,City.city_id,Rental.rental_date)
         .order_by (func.count(Rental.rental_id) )       
         
     )
-    return db.execute(query).all()
+    result = db.execute(query).all()
+    return result
     
+
     
