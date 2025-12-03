@@ -1,4 +1,5 @@
 
+
 from sqlalchemy import select, func, and_,or_
 from sqlalchemy.orm  import Session
 from rental.models import Rental
@@ -132,7 +133,7 @@ def rentals_per_category(start_date,end_date,store_id,city_id,country_id,categor
         .order_by(func.count(Rental.rental_id))
     )
     result = db.execute(query).all()
-    return  result
+    return [dict(r._mapping) for r in result]
 
 def rentals_per_day(start_date,end_date,store_id,city_id,country_id,category_id,film_id, db: Session):
    
@@ -164,6 +165,4 @@ def rentals_per_day(start_date,end_date,store_id,city_id,country_id,category_id,
     )
     result = db.execute(query).all()
     return result
-    
-
     
